@@ -1,0 +1,18 @@
+[project]
+name = "wilco-owner-analysis"
+version = "0.1.0"
+description = "Exploratory ML project for Williamson County owner data."
+requires-python = ">=3.11"
+dependencies = [
+  "pandas>=2.2",
+  "numpy>=1.26",
+  "scikit-learn>=1.5",
+  "matplotlib>=3.8",
+  "seaborn>=0.13",
+  "jupyterlab>=4.2",
+  "pyarrow>=16.0",
+]
+
+[tool.ruff]
+line-length = 100
+
