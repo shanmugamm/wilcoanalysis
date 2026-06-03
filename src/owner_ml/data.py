@@ -6,7 +6,7 @@ from typing import Iterable
 import pandas as pd
 
 
-DEFAULT_DATA_PATH = Path("Owner_20260602.csv")
+DEFAULT_DATA_PATH = Path("src/owner_ml/Owner_20260603.csv")
 OWNER_FILE_PATTERN = "Owner_*.csv"
 
 
