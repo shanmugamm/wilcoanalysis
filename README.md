@@ -35,6 +35,30 @@ Outputs:
 reports/owner_profile.md
 ```
 
+## Automated Report Pipeline
+
+Drop each new extract into this folder as `Owner_YYYYMMDD.csv`, then run:
+
+```powershell
+.\scripts\run_owner_pipeline.ps1
+```
+
+The pipeline automatically selects the newest `Owner_*.csv` file and regenerates the profile, owner-type/geography, multiple-property-owner, and segmentation reports.
+
+Use a specific file:
+
+```powershell
+.\scripts\run_owner_pipeline.ps1 -Data Owner_20260602.csv
+```
+
+Use sampled segmentation for a faster run:
+
+```powershell
+.\scripts\run_owner_pipeline.ps1 -SampleSegments 50000
+```
+
+The reports are generated under `reports/` and intentionally ignored by git.
+
 ## Starter ML: Owner Segments
 
 Run a baseline clustering experiment over sampled owner/address/exemption features:
@@ -77,6 +101,29 @@ reports/top_out_of_state_owner_places.csv
 reports/top_texas_other_owner_places.csv
 ```
 
+## Multiple-Property Owners
+
+Find owners connected to more than one distinct property:
+
+```powershell
+python scripts\04_multi_property_owners.py
+```
+
+Use only primary-owner records:
+
+```powershell
+python scripts\04_multi_property_owners.py --primary-only
+```
+
+Outputs:
+
+```text
+reports/multi_property_owners_report.md
+reports/multi_property_owner_summary.csv
+reports/top_multi_property_owners.csv
+reports/multi_property_owner_detail.csv
+```
+
 ## Suggested Exploration Questions
 
 - Which owner records look like businesses, trusts, governments, or individuals?
@@ -84,3 +131,4 @@ reports/top_texas_other_owner_places.csv
 - Are undeliverable records concentrated in particular owner types or address-change reasons?
 - What exemption combinations appear most often?
 - Can owner/property records be grouped into useful operational segments?
+- Which owners are connected to multiple properties?

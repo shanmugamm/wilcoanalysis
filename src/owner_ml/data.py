@@ -7,6 +7,7 @@ import pandas as pd
 
 
 DEFAULT_DATA_PATH = Path("Owner_20260602.csv")
+OWNER_FILE_PATTERN = "Owner_*.csv"
 
 
 DATE_COLUMNS = ["DateAddrChanged", "DataDate"]
@@ -28,6 +29,19 @@ def read_owner_sample(
     """Read a manageable owner-data sample with basic type cleanup."""
     df = pd.read_csv(path, nrows=nrows, usecols=usecols, low_memory=False)
     return clean_owner_frame(df)
+
+
+def find_latest_owner_csv(directory: str | Path = ".") -> Path:
+    """Find the newest Owner_*.csv extract in a directory."""
+    base_dir = Path(directory)
+    candidates = sorted(
+        base_dir.glob(OWNER_FILE_PATTERN),
+        key=lambda path: (path.stat().st_mtime, path.name),
+        reverse=True,
+    )
+    if not candidates:
+        raise FileNotFoundError(f"No files matching {OWNER_FILE_PATTERN} found in {base_dir.resolve()}")
+    return candidates[0]
 
 
 def read_owner_chunks(
