@@ -24,6 +24,7 @@ env:
   REPORT_SOURCE_GCS_PREFIX: gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest
   OWNER_INPUT_GCS_URI: gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/raw/Owner_20260602.csv
   OWNER_SAMPLE_SEGMENTS: "50000"
+  OWNER_EXCLUDE_ORGANIZATIONS_MULTI_PROPERTY: "true"
   DEPLOY_SERVICE_ACCOUNT: github-deployer@noble-kingdom-497421-f7.iam.gserviceaccount.com
   WORKLOAD_IDENTITY_PROVIDER: projects/921836521382/locations/global/workloadIdentityPools/github-pool/providers/github-wilcoanalysis
 
@@ -61,7 +62,7 @@ jobs:
             --project "${PROJECT_ID}" \
             --command python \
             --args scripts/run_owner_pipeline_gcs_job.py \
-            --set-env-vars "OWNER_INPUT_GCS_URI=${OWNER_INPUT_GCS_URI},REPORT_OUTPUT_GCS_PREFIX=${REPORT_SOURCE_GCS_PREFIX},OWNER_SAMPLE_SEGMENTS=${OWNER_SAMPLE_SEGMENTS}" \
+            --set-env-vars "OWNER_INPUT_GCS_URI=${OWNER_INPUT_GCS_URI},REPORT_OUTPUT_GCS_PREFIX=${REPORT_SOURCE_GCS_PREFIX},OWNER_SAMPLE_SEGMENTS=${OWNER_SAMPLE_SEGMENTS},OWNER_EXCLUDE_ORGANIZATIONS_MULTI_PROPERTY=${OWNER_EXCLUDE_ORGANIZATIONS_MULTI_PROPERTY}" \
             --memory 4Gi \
             --cpu 2 \
             --task-timeout 3600 \

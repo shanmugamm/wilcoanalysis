@@ -162,6 +162,13 @@ Find owners connected to multiple properties:
 python scripts\04_multi_property_owners.py --data Owner_20260602.csv
 ```
 
+Exclude organization-style owners such as LLCs, corporations, banks, governments, and similar
+entities:
+
+```powershell
+python scripts\04_multi_property_owners.py --data Owner_20260602.csv --exclude-organizations
+```
+
 Run baseline ML owner segmentation:
 
 ```powershell
@@ -275,7 +282,7 @@ gcloud.cmd run jobs deploy wilco-owner-pipeline `
   --project noble-kingdom-497421-f7 `
   --command python `
   --args scripts/run_owner_pipeline_gcs_job.py `
-  --set-env-vars OWNER_INPUT_GCS_URI=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/raw/Owner_20260602.csv,REPORT_OUTPUT_GCS_PREFIX=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest,OWNER_SAMPLE_SEGMENTS=50000 `
+  --set-env-vars OWNER_INPUT_GCS_URI=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/raw/Owner_20260602.csv,REPORT_OUTPUT_GCS_PREFIX=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest,OWNER_SAMPLE_SEGMENTS=50000,OWNER_EXCLUDE_ORGANIZATIONS_MULTI_PROPERTY=true `
   --memory 4Gi `
   --cpu 2 `
   --task-timeout 3600
@@ -304,6 +311,8 @@ gcloud.cmd storage cp --recursive gs://wilcoanalysis-artifacts-noble-kingdom-497
   for report artifacts.
 - The Streamlit app reads Cloud Storage reports by default. Local `reports/` files are now
   mainly a development fallback.
+- The multi-property dashboard CSV view includes a checkbox to exclude organization-style
+  owners such as LLCs, corporations, banks, governments, and similar entities.
 - The current ML output is unsupervised segmentation. A true predictive model needs a
   labeled target, model evaluation metrics, and saved model artifacts.
 

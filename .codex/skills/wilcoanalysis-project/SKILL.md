@@ -49,6 +49,9 @@ Maintain a base-version Williamson County property-owner analysis app:
 - GitHub-only deploys need report regeneration or artifact storage, such as Google Cloud Storage.
 - Cloud Run Jobs should use `OWNER_INPUT_GCS_URI` and `REPORT_OUTPUT_GCS_PREFIX` to keep raw
   data and generated reports outside the app image.
+- Multi-property reports support `--exclude-organizations` and the Cloud Run Job env var
+  `OWNER_EXCLUDE_ORGANIZATIONS_MULTI_PROPERTY=true` to exclude organization-style owners
+  such as LLCs, corporations, banks, governments, and similar entities.
 - The Streamlit app reads from `REPORT_SOURCE_GCS_PREFIX`, defaulting to
   `gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest`.
 - The job runtime identity needs `roles/storage.objectAdmin` on the artifact bucket. Current
@@ -114,7 +117,7 @@ gcloud.cmd run jobs deploy wilco-owner-pipeline `
   --project noble-kingdom-497421-f7 `
   --command python `
   --args scripts/run_owner_pipeline_gcs_job.py `
-  --set-env-vars OWNER_INPUT_GCS_URI=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/raw/Owner_20260602.csv,REPORT_OUTPUT_GCS_PREFIX=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest,OWNER_SAMPLE_SEGMENTS=50000 `
+  --set-env-vars OWNER_INPUT_GCS_URI=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/raw/Owner_20260602.csv,REPORT_OUTPUT_GCS_PREFIX=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest,OWNER_SAMPLE_SEGMENTS=50000,OWNER_EXCLUDE_ORGANIZATIONS_MULTI_PROPERTY=true `
   --memory 4Gi `
   --cpu 2 `
   --task-timeout 3600

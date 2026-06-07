@@ -69,6 +69,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         default=os.getenv("OWNER_PRIMARY_ONLY_MULTI_PROPERTY", "").lower() in {"1", "true", "yes"},
     )
+    parser.add_argument(
+        "--exclude-organizations-multi-property",
+        action="store_true",
+        default=os.getenv("OWNER_EXCLUDE_ORGANIZATIONS_MULTI_PROPERTY", "").lower()
+        in {"1", "true", "yes"},
+    )
     return parser.parse_args()
 
 
@@ -104,6 +110,8 @@ def main() -> None:
         command.extend(["--sample-segments", str(args.sample_segments)])
     if args.primary_only_multi_property:
         command.append("--primary-only-multi-property")
+    if args.exclude_organizations_multi_property:
+        command.append("--exclude-organizations-multi-property")
 
     print("Running:", " ".join(command))
     subprocess.check_call(command)
