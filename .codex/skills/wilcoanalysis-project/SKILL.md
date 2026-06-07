@@ -24,9 +24,11 @@ Maintain a base-version Williamson County property-owner analysis app:
 ## Important Files
 
 - `app.py`: Streamlit dashboard that lists and displays Markdown/CSV reports from GCS by
-  default, with local `reports/` fallback. It has Overview, Tables, and Narratives views;
-  the Tables view supports search, owner/geography filters, multi-property organization
-  exclusion, column selection, sorting, row limits, charts, and filtered downloads.
+  default, with local `reports/` fallback. It has Overview, Owner Drilldown, Tables, and
+  Narratives views. Owner Drilldown shows unique property owners by property count and the
+  properties tied to a selected owner. Tables supports search, owner/geography filters,
+  multi-property organization exclusion, column selection, sorting, row limits, charts, and
+  filtered downloads.
 - `src/owner_ml/data.py`: CSV discovery, chunked reads, basic type cleanup.
 - `src/owner_ml/features.py`: owner type guesses, mailing geography, exemption features, profile labels.
 - `scripts/run_owner_pipeline.py`: end-to-end report pipeline.

@@ -172,6 +172,10 @@ def sorted_reports(reports: list[ReportFile], preferred: list[str]) -> list[Repo
     return sorted(reports, key=lambda report: (rank.get(report.name, 999), display_name(report)))
 
 
+def report_by_name(reports: list[ReportFile], name: str) -> ReportFile | None:
+    return next((report for report in reports if report.name == name), None)
+
+
 def metric_value(value: object) -> str:
     if pd.isna(value):
         return "-"
@@ -240,6 +244,186 @@ def render_markdown_report(report: ReportFile, gcs_prefix: str | None) -> None:
     st.subheader(display_name(report))
     st.download_button("Download Markdown", text, file_name=report.name)
     st.markdown(text, unsafe_allow_html=True)
+
+
+def build_owner_label(row: pd.Series) -> str:
+    owner_name = row.get("full_name", row.get("FullName", "Unknown owner"))
+    city = row.get("city", row.get("City", ""))
+    state = row.get("state", row.get("State", ""))
+    count = row.get("distinct_properties", "")
+    location = ", ".join([value for value in [str(city), str(state)] if value and value != "nan"])
+    suffix = f" - {location}" if location else ""
+    return f"{owner_name}{suffix} ({count} properties)"
+
+
+def selected_dataframe_rows(event: object) -> list[int]:
+    if hasattr(event, "selection"):
+        selection = event.selection
+        if isinstance(selection, dict):
+            return selection.get("rows", [])
+        return getattr(selection, "rows", [])
+    if isinstance(event, dict):
+        selection = event.get("selection", {})
+        return selection.get("rows", []) if isinstance(selection, dict) else []
+    return []
+
+
+def render_owner_drilldown(csv_reports: list[ReportFile], gcs_prefix: str | None) -> None:
+    summary_report = report_by_name(csv_reports, "multi_property_owner_summary.csv")
+    detail_report = report_by_name(csv_reports, "multi_property_owner_detail.csv")
+
+    if not summary_report or not detail_report:
+        st.info("Owner drilldown needs `multi_property_owner_summary.csv` and `multi_property_owner_detail.csv`.")
+        return
+
+    summary = load_csv_report(summary_report, gcs_prefix)
+    detail = load_csv_report(detail_report, gcs_prefix)
+
+    st.subheader("Unique Property Owners")
+    st.caption("Select an owner row to see every property tied to that owner.")
+
+    filtered = summary.copy()
+    with st.expander("Owner Filters", expanded=True):
+        query = st.text_input("Search owner, address, city, or state", placeholder="Try MORROW, AUSTIN, TX...")
+        filtered = apply_text_search(filtered, query)
+
+        exclude_organizations = st.checkbox("Exclude organizations / LLCs", value=True)
+        if exclude_organizations:
+            before_rows = len(filtered)
+            filtered = filtered[~organization_owner_mask(filtered)].copy()
+            st.caption(f"Filtered out {before_rows - len(filtered):,} organization-style owners.")
+
+        filter_cols = st.columns(4)
+        owner_type_col = find_column(filtered, ["owner_type", "OwnerTypeGuess"])
+        geo_col = find_column(filtered, ["mailing_geo", "MailingGeo"])
+        city_col = find_column(filtered, ["city", "City"])
+        property_count_col = find_column(filtered, ["distinct_properties"])
+
+        if owner_type_col:
+            options = sorted(filtered[owner_type_col].fillna("").astype(str).unique())
+            selected = filter_cols[0].multiselect("Owner type", options)
+            filtered = apply_select_filter(filtered, owner_type_col, selected)
+
+        if geo_col:
+            options = sorted(filtered[geo_col].fillna("").astype(str).unique())
+            selected = filter_cols[1].multiselect("Mailing geography", options)
+            filtered = apply_select_filter(filtered, geo_col, selected)
+
+        if city_col:
+            city_counts = filtered[city_col].fillna("").astype(str).value_counts()
+            selected = filter_cols[2].multiselect("City", city_counts.head(50).index.tolist())
+            filtered = apply_select_filter(filtered, city_col, selected)
+
+        if property_count_col:
+            property_counts = pd.to_numeric(filtered[property_count_col], errors="coerce")
+            min_count = int(property_counts.min()) if property_counts.notna().any() else 2
+            max_count = int(property_counts.max()) if property_counts.notna().any() else min_count
+            if min_count < max_count:
+                selected_min = filter_cols[3].slider(
+                    "Min properties",
+                    min_value=min_count,
+                    max_value=max_count,
+                    value=min_count,
+                )
+                filtered = filtered[property_counts.ge(selected_min)]
+
+    property_count_col = find_column(filtered, ["distinct_properties"])
+    if property_count_col:
+        filtered = filtered.sort_values(property_count_col, ascending=False, kind="stable")
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Owners", f"{len(filtered):,}")
+    m2.metric("Total Property Links", metric_value(pd.to_numeric(filtered.get("distinct_properties", 0), errors="coerce").sum()))
+    m3.metric("Top Owner Count", metric_value(pd.to_numeric(filtered.get("distinct_properties", 0), errors="coerce").max()))
+
+    owner_columns = [
+        column
+        for column in [
+            "full_name",
+            "distinct_properties",
+            "owner_rows",
+            "mailing_address",
+            "city",
+            "state",
+            "owner_type",
+            "profile_segment",
+            "mailing_geo",
+            "owner_key",
+        ]
+        if column in filtered
+    ]
+    owner_view = filtered[owner_columns].head(1000).reset_index(drop=True)
+    if owner_view.empty:
+        st.info("No owners match the current filters.")
+        return
+
+    event = st.dataframe(
+        owner_view,
+        hide_index=True,
+        use_container_width=True,
+        height=420,
+        selection_mode="single-row",
+        on_select="rerun",
+        key="owner_drilldown_table",
+    )
+
+    selected_owner_key = None
+    selected_rows = selected_dataframe_rows(event)
+    if selected_rows:
+        selected_owner_key = owner_view.iloc[selected_rows[0]].get("owner_key")
+
+    if not selected_owner_key:
+        labels = {build_owner_label(row): row.get("owner_key") for _, row in owner_view.head(200).iterrows()}
+        selected_label = st.selectbox("Or choose an owner", list(labels))
+        selected_owner_key = labels[selected_label]
+
+    if not selected_owner_key:
+        return
+
+    detail_owner_col = find_column(detail, ["OwnerKey", "owner_key"])
+    if not detail_owner_col:
+        st.warning("The detail report does not include an owner key column.")
+        return
+
+    owner_properties = detail[detail[detail_owner_col].astype(str).eq(str(selected_owner_key))].copy()
+    st.divider()
+    st.subheader("Properties Owned")
+
+    selected_owner = filtered[filtered["owner_key"].astype(str).eq(str(selected_owner_key))]
+    if not selected_owner.empty:
+        row = selected_owner.iloc[0]
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Owner", row.get("full_name", ""))
+        c2.metric("Properties", metric_value(row.get("distinct_properties", len(owner_properties))))
+        c3.metric("Mailing Geo", row.get("mailing_geo", ""))
+
+    display_columns = [
+        column
+        for column in [
+            "PropertyID",
+            "QuickRefID",
+            "OwnerPropertyNumber",
+            "Address1",
+            "Address2",
+            "Address3",
+            "PercentOwnership",
+            "PrimaryOwner",
+            "ExemptionList",
+            "OwnerProfileSegment",
+            "MailingGeo",
+        ]
+        if column in owner_properties
+    ]
+    if not display_columns:
+        display_columns = owner_properties.columns.tolist()
+
+    st.dataframe(owner_properties[display_columns], hide_index=True, use_container_width=True)
+    st.download_button(
+        "Download Owner Properties",
+        owner_properties.to_csv(index=False).encode("utf-8"),
+        file_name=f"properties_{selected_owner_key}.csv",
+        mime="text/csv",
+    )
 
 
 def filter_dataframe(df: pd.DataFrame, report: ReportFile) -> pd.DataFrame:
@@ -367,10 +551,16 @@ render_header(source_label)
 
 with st.sidebar:
     st.header("Reports")
-    section = st.radio("View", ["Overview", "Tables", "Narratives"], label_visibility="collapsed")
+    section = st.radio(
+        "View",
+        ["Overview", "Owner Drilldown", "Tables", "Narratives"],
+        label_visibility="collapsed",
+    )
 
 if section == "Overview":
     render_overview(csv_reports, md_reports, active_gcs_prefix)
+elif section == "Owner Drilldown":
+    render_owner_drilldown(csv_reports, active_gcs_prefix)
 elif section == "Tables":
     if not csv_reports:
         st.info("No CSV reports found.")

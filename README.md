@@ -118,6 +118,8 @@ local files for development.
 The dashboard has three views:
 
 - Overview: report inventory and high-level counts.
+- Owner Drilldown: unique property owners by property count; selecting an owner shows all
+  properties tied to that owner.
 - Tables: interactive CSV explorer with search, filters, sorting, column selection, and
   filtered downloads.
 - Narratives: rendered Markdown reports.
