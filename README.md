@@ -23,6 +23,7 @@ https://wilcoanalysis-ld322r5mnq-uc.a.run.app
 - Produces Markdown and CSV reports under `reports/`.
 - Serves generated reports through a Streamlit dashboard.
 - Deploys the Streamlit app to Google Cloud Run using the included `Dockerfile`.
+- Can run the report pipeline as a Cloud Run Job using Cloud Storage input/output.
 
 ## Repository Layout
 
@@ -37,6 +38,8 @@ scripts/
   03_owner_type_geo_analysis.py
                                 Owner type and mailing geography reports
   04_multi_property_owners.py  Multiple-property owner analysis
+  run_owner_pipeline_gcs_job.py
+                                Cloud Run Job entrypoint for GCS input/output
   run_owner_pipeline.py        End-to-end report pipeline
 src/owner_ml/
   data.py                      CSV discovery, chunked reads, and cleanup
@@ -190,12 +193,75 @@ gcloud.cmd run deploy wilcoanalysis `
 On Windows PowerShell, use `gcloud.cmd` if the PowerShell script shim is blocked by local
 execution policy.
 
+## Run The Pipeline In Cloud Run Jobs
+
+The enterprise-friendly flow is:
+
+```text
+Cloud Storage raw CSV -> Cloud Run Job pipeline -> Cloud Storage reports -> Streamlit app
+```
+
+Create a storage bucket once:
+
+```powershell
+gcloud.cmd storage buckets create gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7 `
+  --location=us-central1 `
+  --project=noble-kingdom-497421-f7
+```
+
+Allow the Cloud Run Job runtime service account to read/write objects in that bucket:
+
+```powershell
+gcloud.cmd storage buckets add-iam-policy-binding gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7 `
+  --member serviceAccount:921836521382-compute@developer.gserviceaccount.com `
+  --role roles/storage.objectAdmin `
+  --project noble-kingdom-497421-f7
+```
+
+Upload the owner extract:
+
+```powershell
+gcloud.cmd storage cp Owner_20260602.csv gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/raw/Owner_20260602.csv
+```
+
+Deploy or update the Cloud Run Job from this source tree:
+
+```powershell
+gcloud.cmd run jobs deploy wilco-owner-pipeline `
+  --source . `
+  --region us-central1 `
+  --project noble-kingdom-497421-f7 `
+  --command python `
+  --args scripts/run_owner_pipeline_gcs_job.py `
+  --set-env-vars OWNER_INPUT_GCS_URI=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/raw/Owner_20260602.csv,REPORT_OUTPUT_GCS_PREFIX=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest,OWNER_SAMPLE_SEGMENTS=50000 `
+  --memory 4Gi `
+  --cpu 2 `
+  --task-timeout 3600
+```
+
+Run the job:
+
+```powershell
+gcloud.cmd run jobs execute wilco-owner-pipeline `
+  --region us-central1 `
+  --project noble-kingdom-497421-f7 `
+  --wait
+```
+
+Download generated reports if needed:
+
+```powershell
+gcloud.cmd storage cp --recursive gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest reports
+```
+
 ## Important Limitations
 
 - Report files are local generated artifacts and are not committed to git.
 - A deploy from the local workspace includes the current local `reports/` files.
 - A deploy from GitHub alone will need a report-generation step or a cloud storage location
   for report artifacts.
+- The Cloud Run Job can generate reports into Cloud Storage, but the Streamlit app still reads
+  local `reports/` files until the app is updated to read directly from Cloud Storage.
 - The current ML output is unsupervised segmentation. A true predictive model needs a
   labeled target, model evaluation metrics, and saved model artifacts.
 

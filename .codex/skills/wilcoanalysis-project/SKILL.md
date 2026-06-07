@@ -18,6 +18,7 @@ Maintain a base-version Williamson County property-owner analysis app:
 - run exploratory owner segmentation;
 - generate Markdown/CSV reports in `reports/`;
 - display those reports in a Streamlit app;
+- run the report pipeline as a Cloud Run Job with Cloud Storage input/output;
 - deploy the app to Google Cloud Run.
 
 ## Important Files
@@ -30,6 +31,8 @@ Maintain a base-version Williamson County property-owner analysis app:
 - `scripts/02_owner_segments.py`: exploratory ML clustering with `MiniBatchKMeans`.
 - `scripts/03_owner_type_geo_analysis.py`: owner type and mailing geography summaries.
 - `scripts/04_multi_property_owners.py`: owners linked to multiple distinct properties.
+- `scripts/run_owner_pipeline_gcs_job.py`: Cloud Run Job wrapper that downloads an owner
+  extract from GCS, runs the local pipeline, and uploads generated reports to GCS.
 - `Dockerfile`, `.dockerignore`, `.gcloudignore`: Cloud Run deployment setup.
 - `README.md`: user-facing project guide.
 
@@ -41,6 +44,10 @@ Maintain a base-version Williamson County property-owner analysis app:
 - `reports/.gitkeep` keeps the directory present.
 - Local Cloud Run deploys include current local reports because `.gcloudignore` does not exclude `reports/`.
 - GitHub-only deploys need report regeneration or artifact storage, such as Google Cloud Storage.
+- Cloud Run Jobs should use `OWNER_INPUT_GCS_URI` and `REPORT_OUTPUT_GCS_PREFIX` to keep raw
+  data and generated reports outside the app image.
+- The job runtime identity needs `roles/storage.objectAdmin` on the artifact bucket. Current
+  default service account: `921836521382-compute@developer.gserviceaccount.com`.
 
 ## Common Commands
 
@@ -89,12 +96,38 @@ gcloud.cmd run deploy wilcoanalysis `
 
 Use `gcloud.cmd` on Windows when PowerShell blocks the `gcloud.ps1` shim.
 
+Deploy the Cloud Run Job:
+
+```powershell
+gcloud.cmd run jobs deploy wilco-owner-pipeline `
+  --source . `
+  --region us-central1 `
+  --project noble-kingdom-497421-f7 `
+  --command python `
+  --args scripts/run_owner_pipeline_gcs_job.py `
+  --set-env-vars OWNER_INPUT_GCS_URI=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/raw/Owner_20260602.csv,REPORT_OUTPUT_GCS_PREFIX=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest,OWNER_SAMPLE_SEGMENTS=50000 `
+  --memory 4Gi `
+  --cpu 2 `
+  --task-timeout 3600
+```
+
+Execute the Cloud Run Job:
+
+```powershell
+gcloud.cmd run jobs execute wilco-owner-pipeline `
+  --region us-central1 `
+  --project noble-kingdom-497421-f7 `
+  --wait
+```
+
 ## Current Cloud Run Service
 
 - Project: `noble-kingdom-497421-f7`
 - Region: `us-central1`
 - Service: `wilcoanalysis`
 - URL: `https://wilcoanalysis-ld322r5mnq-uc.a.run.app`
+- Pipeline job: `wilco-owner-pipeline`
+- Artifact bucket: `gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7`
 
 ## ML Context
 
@@ -120,4 +153,6 @@ encoding, numeric scaling, and `MiniBatchKMeans`.
 - Prefer updating scripts and README together when changing workflow commands.
 - When changing dashboard behavior, remember that Cloud Run uses port `${PORT:-8080}` from the Dockerfile.
 - After deployment config changes, deploy with `gcloud.cmd run deploy ...` and verify the public URL returns `200 OK`.
+- After pipeline job changes, deploy with `gcloud.cmd run jobs deploy ...`, execute with
+  `gcloud.cmd run jobs execute ... --wait`, and check that reports upload to GCS.
 - When pushing changes, commit only intentional project files and leave ignored raw/report artifacts alone.
