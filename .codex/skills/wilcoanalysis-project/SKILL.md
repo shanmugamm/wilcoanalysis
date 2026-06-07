@@ -36,7 +36,7 @@ Maintain a base-version Williamson County property-owner analysis app:
   extract from GCS, runs the local pipeline, and uploads generated reports to GCS.
 - `Dockerfile`, `.dockerignore`, `.gcloudignore`: Cloud Run deployment setup.
 - `.github/workflows/deploy-streamlit-service.yml`: path-filtered GitHub Actions deploy for
-  the Streamlit Cloud Run service.
+  the Streamlit Cloud Run service; includes `app.py` and shared dashboard filter helpers.
 - `.github/workflows/deploy-pipeline-job.yml`: path-filtered GitHub Actions deploy for the
   Cloud Run Job definition; it does not execute the pipeline job.
 - `README.md`: user-facing project guide.

@@ -25,14 +25,54 @@ WILCO_CITY_NAMES = {
 }
 
 BUSINESS_TERMS = re.compile(
-    r"\b(?:LLC|L L C|INC|CORP|CO\b|LTD|LP|LLP|BANK|HOLDINGS|PROPERTIES|"
-    r"INVEST|VENTURES|PARTNERS|ASSOC|ASSOCIATION|COMPANY)\b",
+    r"\b(?:LLC|L L C|INC|CORP|CORPORATION|CO\b|LTD|LP|LLP|BANK|HOLDINGS|PROPERTIES|"
+    r"PROPERTY|INVEST|INVESTMENT|INVESTMENTS|VENTURES|PARTNERS|PARTNERSHIP|ASSOC|"
+    r"ASSOCIATION|COMPANY|ENTERPRISES|SERVICES|GROUP|CAPITAL|ASSET|ASSETS|REALTY|"
+    r"REAL ESTATE|MANAGEMENT|MGT|DEVELOPMENT|CONSTRUCTION|HOMES|BUILDERS|ENERGY|"
+    r"ELECTRIC|UTILITY|UTILITIES|WATER|GAS|STORE|STORES|MARKET|FOODS|RESTAURANT|"
+    r"MEDICAL|DENTAL|HOSPITAL|CLINIC|FOUNDATION|CHURCH|MINISTRIES|CLUB|HOA|POA)\b",
     flags=re.IGNORECASE,
 )
 TRUST_TERMS = re.compile(r"\b(?:TRUST|TRUSTEE|REVOCABLE|IRREVOCABLE|ESTATE)\b", flags=re.IGNORECASE)
 GOV_TERMS = re.compile(
-    r"\b(?:CITY OF|COUNTY|STATE OF|ISD|SCHOOL|USA|UNITED STATES)\b", flags=re.IGNORECASE
+    r"\b(?:CITY OF|COUNTY|STATE OF|ISD|SCHOOL|UNIVERSITY|MUD|USA|UNITED STATES)\b",
+    flags=re.IGNORECASE,
 )
+ORGANIZATION_OWNER_TYPES = {"business", "government"}
+ORGANIZATION_NAME_TERMS = re.compile(
+    r"\b(?:7\s*-?\s*ELEVEN|ATMOS|ONCOR|WALMART|WAL-MART|SAMS CLUB|SAM'S CLUB|"
+    r"HEB|H E B|TARGET|COSTCO|HOME DEPOT|LOWES|LOWE'S|STARBUCKS|MCDONALD'?S|"
+    r"CHICK[- ]?FIL[- ]?A|CVS|WALGREENS|SHELL|EXXON|CHEVRON|TEXACO|VALERO|"
+    r"LLC|L L C|INC|CORP|CORPORATION|CO\b|LTD|LP|LLP|BANK|HOLDINGS|PROPERTIES|"
+    r"PROPERTY|INVEST|INVESTMENT|INVESTMENTS|VENTURES|PARTNERS|PARTNERSHIP|ASSOC|"
+    r"ASSOCIATION|COMPANY|ENTERPRISES|SERVICES|GROUP|CAPITAL|ASSET|ASSETS|REALTY|"
+    r"REAL ESTATE|MANAGEMENT|MGT|DEVELOPMENT|CONSTRUCTION|HOMES|BUILDERS|ENERGY|"
+    r"ELECTRIC|UTILITY|UTILITIES|WATER|GAS|STORE|STORES|MARKET|FOODS|RESTAURANT|"
+    r"MEDICAL|DENTAL|HOSPITAL|CLINIC|FOUNDATION|CHURCH|MINISTRIES|CLUB|HOA|POA|"
+    r"CITY OF|COUNTY|STATE OF|ISD|SCHOOL|UNIVERSITY|MUD|USA|UNITED STATES)\b",
+    flags=re.IGNORECASE,
+)
+
+
+def organization_owner_mask(
+    df: pd.DataFrame,
+    owner_type_columns: tuple[str, ...] = ("OwnerTypeGuess", "owner_type"),
+    name_columns: tuple[str, ...] = ("FullName", "full_name"),
+) -> pd.Series:
+    """Return rows that look like organization owners rather than natural persons."""
+    mask = pd.Series(False, index=df.index)
+
+    for column in owner_type_columns:
+        if column in df:
+            owner_type = df[column].fillna("").astype(str).str.lower()
+            mask = mask | owner_type.isin(ORGANIZATION_OWNER_TYPES)
+
+    for column in name_columns:
+        if column in df:
+            name = df[column].fillna("").astype(str)
+            mask = mask | name.str.contains(ORGANIZATION_NAME_TERMS, regex=True, na=False)
+
+    return mask
 
 
 def add_owner_features(df: pd.DataFrame) -> pd.DataFrame:

@@ -9,7 +9,7 @@ import pandas as pd
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
 from owner_ml.data import DEFAULT_DATA_PATH, read_owner_sample
-from owner_ml.features import add_owner_features
+from owner_ml.features import add_owner_features, organization_owner_mask
 
 
 BASE_COLUMNS = [
@@ -32,13 +32,6 @@ BASE_COLUMNS = [
     "Address2",
     "Address3",
 ]
-
-ORGANIZATION_OWNER_TYPES = {"business", "government"}
-ORGANIZATION_NAME_PATTERN = (
-    r"\b(?:LLC|L L C|INC|CORP|CO\b|LTD|LP|LLP|BANK|HOLDINGS|PROPERTIES|"
-    r"INVEST|VENTURES|PARTNERS|ASSOC|ASSOCIATION|COMPANY|CITY OF|COUNTY|STATE OF|ISD)\b"
-)
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Find owners connected to multiple properties.")
@@ -111,11 +104,9 @@ def main() -> None:
         df = df[df["PrimaryOwner"].eq(1)].copy()
     excluded_organization_rows = 0
     if args.exclude_organizations:
-        organization_mask = df["OwnerTypeGuess"].isin(ORGANIZATION_OWNER_TYPES) | df[
-            "FullName"
-        ].str.contains(ORGANIZATION_NAME_PATTERN, case=False, regex=True, na=False)
-        excluded_organization_rows = int(organization_mask.sum())
-        df = df[~organization_mask].copy()
+        org_mask = organization_owner_mask(df)
+        excluded_organization_rows = int(org_mask.sum())
+        df = df[~org_mask].copy()
 
     df = df[[column for column in BASE_COLUMNS if column in df.columns]].copy()
     df["OwnerKey"] = df["OwnerID"].where(df["OwnerID"].ne(""), df["FullName"] + "|" + df["MailingAddress"])

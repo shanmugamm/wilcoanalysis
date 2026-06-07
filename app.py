@@ -2,21 +2,18 @@ from pathlib import Path
 from dataclasses import dataclass
 from io import BytesIO
 import os
-import re
+import sys
 from urllib.parse import urlparse
 
 import pandas as pd
 import streamlit as st
 from google.cloud import storage
 
+sys.path.append(str(Path(__file__).resolve().parent / "src"))
+from owner_ml.features import organization_owner_mask
+
 
 DEFAULT_GCS_PREFIX = "gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest"
-ORGANIZATION_OWNER_TYPES = {"business", "government"}
-ORGANIZATION_NAME_PATTERN = re.compile(
-    r"\b(?:LLC|L L C|INC|CORP|CO\b|LTD|LP|LLP|BANK|HOLDINGS|PROPERTIES|"
-    r"INVEST|VENTURES|PARTNERS|ASSOC|ASSOCIATION|COMPANY|CITY OF|COUNTY|STATE OF|ISD)\b",
-    flags=re.IGNORECASE,
-)
 
 
 @dataclass(frozen=True)
@@ -81,21 +78,6 @@ def is_multi_property_report(report: ReportFile) -> bool:
     return "multi_property" in report.name.lower()
 
 
-def organization_mask(df: pd.DataFrame) -> pd.Series:
-    mask = pd.Series(False, index=df.index)
-    for column in ["owner_type", "OwnerTypeGuess"]:
-        if column in df:
-            mask = mask | df[column].fillna("").str.lower().isin(ORGANIZATION_OWNER_TYPES)
-    for column in ["full_name", "FullName"]:
-        if column in df:
-            mask = mask | df[column].fillna("").str.contains(
-                ORGANIZATION_NAME_PATTERN,
-                regex=True,
-                na=False,
-            )
-    return mask
-
-
 st.set_page_config(page_title="Owner Reports", layout="wide")
 st.title("Owner Reports Dashboard")
 
@@ -144,7 +126,7 @@ def show_csv(report: ReportFile):
         )
         if exclude_organizations:
             before_rows = len(df)
-            df = df[~organization_mask(df)].copy()
+            df = df[~organization_owner_mask(df)].copy()
             st.caption(f"Filtered out {before_rows - len(df):,} organization-style rows.")
     st.dataframe(df)
     st.download_button("Download CSV", data, file_name=report.name)

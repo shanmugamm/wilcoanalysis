@@ -211,7 +211,7 @@ Deployment is handled by two GitHub Actions workflows with path filters:
 The workflows use Google Workload Identity Federation, so no long-lived service account key
 is stored in GitHub.
 
-- Streamlit app changes deploy only Cloud Run service: `wilcoanalysis`
+- Streamlit app/shared dashboard filter changes deploy only Cloud Run service: `wilcoanalysis`
 - Pipeline/script/model changes deploy only Cloud Run Job definition: `wilco-owner-pipeline`
 - README/docs-only changes do not deploy either resource
 

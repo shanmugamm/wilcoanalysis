@@ -9,6 +9,7 @@ on:
       - Dockerfile
       - requirements.txt
       - pyproject.toml
+      - src/owner_ml/features.py
       - .dockerignore
       - .gcloudignore
       - .github/workflows/deploy-streamlit-service.yml
