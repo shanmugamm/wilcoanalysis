@@ -248,12 +248,14 @@ def render_markdown_report(report: ReportFile, gcs_prefix: str | None) -> None:
 
 def build_owner_label(row: pd.Series) -> str:
     owner_name = row.get("full_name", row.get("FullName", "Unknown owner"))
+    owner_id = row.get("owner_id", row.get("OwnerID", row.get("owner_key", "")))
     city = row.get("city", row.get("City", ""))
     state = row.get("state", row.get("State", ""))
     count = row.get("distinct_properties", "")
     location = ", ".join([value for value in [str(city), str(state)] if value and value != "nan"])
     suffix = f" - {location}" if location else ""
-    return f"{owner_name}{suffix} ({count} properties)"
+    id_suffix = f" [{owner_id}]" if owner_id and str(owner_id) != "nan" else ""
+    return f"{owner_name}{id_suffix}{suffix} ({count} properties)"
 
 
 def selected_dataframe_rows(event: object) -> list[int]:
@@ -280,7 +282,7 @@ def render_owner_drilldown(csv_reports: list[ReportFile], gcs_prefix: str | None
     detail = load_csv_report(detail_report, gcs_prefix)
 
     st.subheader("Unique Property Owners")
-    st.caption("Select an owner row to see every property tied to that owner.")
+    st.caption("Choose an owner to see every property tied to that owner.")
 
     filtered = summary.copy()
     with st.expander("Owner Filters", expanded=True):
@@ -357,6 +359,10 @@ def render_owner_drilldown(csv_reports: list[ReportFile], gcs_prefix: str | None
         st.info("No owners match the current filters.")
         return
 
+    labels = {build_owner_label(row): row.get("owner_key") for _, row in owner_view.head(500).iterrows()}
+    selected_label = st.selectbox("Owner", list(labels))
+    selected_owner_key = labels[selected_label]
+
     event = st.dataframe(
         owner_view,
         hide_index=True,
@@ -366,16 +372,12 @@ def render_owner_drilldown(csv_reports: list[ReportFile], gcs_prefix: str | None
         on_select="rerun",
         key="owner_drilldown_table",
     )
-
-    selected_owner_key = None
     selected_rows = selected_dataframe_rows(event)
     if selected_rows:
-        selected_owner_key = owner_view.iloc[selected_rows[0]].get("owner_key")
-
-    if not selected_owner_key:
-        labels = {build_owner_label(row): row.get("owner_key") for _, row in owner_view.head(200).iterrows()}
-        selected_label = st.selectbox("Or choose an owner", list(labels))
-        selected_owner_key = labels[selected_label]
+        clicked_key = owner_view.iloc[selected_rows[0]].get("owner_key")
+        if clicked_key != selected_owner_key:
+            clicked_label = build_owner_label(owner_view.iloc[selected_rows[0]])
+            st.caption(f"Clicked row: {clicked_label}. Use the Owner selector above to load it.")
 
     if not selected_owner_key:
         return
