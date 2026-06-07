@@ -201,19 +201,21 @@ The model assigns each record to an `OwnerSegment` cluster and also reports an i
 
 ## Deploy To Google Cloud Run
 
-Deployment is now handled by GitHub Actions on every push to `main`:
+Deployment is handled by two GitHub Actions workflows with path filters:
 
 ```text
-.github/workflows/deploy-cloud-run.yml
+.github/workflows/deploy-streamlit-service.yml
+.github/workflows/deploy-pipeline-job.yml
 ```
 
-The workflow uses Google Workload Identity Federation, so no long-lived service account key
-is stored in GitHub. It deploys:
+The workflows use Google Workload Identity Federation, so no long-lived service account key
+is stored in GitHub.
 
-- Cloud Run service: `wilcoanalysis`
-- Cloud Run Job definition: `wilco-owner-pipeline`
+- Streamlit app changes deploy only Cloud Run service: `wilcoanalysis`
+- Pipeline/script/model changes deploy only Cloud Run Job definition: `wilco-owner-pipeline`
+- README/docs-only changes do not deploy either resource
 
-The workflow does not execute the pipeline job automatically. Run the job manually when a new
+The job workflow does not execute the pipeline job automatically. Run the job manually when a new
 owner extract is ready.
 
 Manual local deploy is still available when needed:

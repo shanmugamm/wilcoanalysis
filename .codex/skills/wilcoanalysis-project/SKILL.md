@@ -35,8 +35,10 @@ Maintain a base-version Williamson County property-owner analysis app:
 - `scripts/run_owner_pipeline_gcs_job.py`: Cloud Run Job wrapper that downloads an owner
   extract from GCS, runs the local pipeline, and uploads generated reports to GCS.
 - `Dockerfile`, `.dockerignore`, `.gcloudignore`: Cloud Run deployment setup.
-- `.github/workflows/deploy-cloud-run.yml`: deploys the Cloud Run service and job definition
-  from GitHub Actions on pushes to `main`; it does not execute the pipeline job.
+- `.github/workflows/deploy-streamlit-service.yml`: path-filtered GitHub Actions deploy for
+  the Streamlit Cloud Run service.
+- `.github/workflows/deploy-pipeline-job.yml`: path-filtered GitHub Actions deploy for the
+  Cloud Run Job definition; it does not execute the pipeline job.
 - `README.md`: user-facing project guide.
 
 ## Data And Artifacts
