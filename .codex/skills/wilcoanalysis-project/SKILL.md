@@ -23,7 +23,8 @@ Maintain a base-version Williamson County property-owner analysis app:
 
 ## Important Files
 
-- `app.py`: Streamlit dashboard that lists and displays Markdown/CSV files from `reports/`.
+- `app.py`: Streamlit dashboard that lists and displays Markdown/CSV reports from GCS by
+  default, with local `reports/` fallback.
 - `src/owner_ml/data.py`: CSV discovery, chunked reads, basic type cleanup.
 - `src/owner_ml/features.py`: owner type guesses, mailing geography, exemption features, profile labels.
 - `scripts/run_owner_pipeline.py`: end-to-end report pipeline.
@@ -46,6 +47,8 @@ Maintain a base-version Williamson County property-owner analysis app:
 - GitHub-only deploys need report regeneration or artifact storage, such as Google Cloud Storage.
 - Cloud Run Jobs should use `OWNER_INPUT_GCS_URI` and `REPORT_OUTPUT_GCS_PREFIX` to keep raw
   data and generated reports outside the app image.
+- The Streamlit app reads from `REPORT_SOURCE_GCS_PREFIX`, defaulting to
+  `gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest`.
 - The job runtime identity needs `roles/storage.objectAdmin` on the artifact bucket. Current
   default service account: `921836521382-compute@developer.gserviceaccount.com`.
 
@@ -91,6 +94,7 @@ gcloud.cmd run deploy wilcoanalysis `
   --source . `
   --region us-central1 `
   --project noble-kingdom-497421-f7 `
+  --set-env-vars REPORT_SOURCE_GCS_PREFIX=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest `
   --allow-unauthenticated
 ```
 

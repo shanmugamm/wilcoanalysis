@@ -1,52 +1,138 @@
 from pathlib import Path
+from dataclasses import dataclass
+from io import BytesIO
+import os
+from urllib.parse import urlparse
+
 import pandas as pd
 import streamlit as st
+from google.cloud import storage
+
+
+DEFAULT_GCS_PREFIX = "gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest"
+
+
+@dataclass(frozen=True)
+class ReportFile:
+    name: str
+    suffix: str
+    source: str
+
+
+def parse_gcs_prefix(uri: str) -> tuple[str, str]:
+    parsed = urlparse(uri)
+    if parsed.scheme != "gs" or not parsed.netloc:
+        raise ValueError(f"Expected a GCS prefix like gs://bucket/path, got: {uri}")
+    return parsed.netloc, parsed.path.lstrip("/")
+
+
+@st.cache_data(ttl=300)
+def list_gcs_reports(gcs_prefix: str) -> list[ReportFile]:
+    bucket_name, prefix = parse_gcs_prefix(gcs_prefix)
+    client = storage.Client()
+    reports = []
+    for blob in client.list_blobs(bucket_name, prefix=prefix.rstrip("/") + "/"):
+        if blob.name.endswith("/"):
+            continue
+        name = Path(blob.name).name
+        reports.append(ReportFile(name=name, suffix=Path(name).suffix.lower(), source=blob.name))
+    return sorted(reports, key=lambda report: report.name)
+
+
+@st.cache_data(ttl=300)
+def read_gcs_report(gcs_prefix: str, blob_name: str) -> bytes:
+    bucket_name, _ = parse_gcs_prefix(gcs_prefix)
+    client = storage.Client()
+    return client.bucket(bucket_name).blob(blob_name).download_as_bytes()
+
+
+def list_local_reports(report_dir: Path) -> list[ReportFile]:
+    return [
+        ReportFile(name=path.name, suffix=path.suffix.lower(), source=str(path))
+        for path in sorted(report_dir.iterdir())
+        if path.is_file()
+    ]
+
+
+def read_report_bytes(report: ReportFile, gcs_prefix: str | None) -> bytes:
+    if gcs_prefix:
+        return read_gcs_report(gcs_prefix, report.source)
+    return Path(report.source).read_bytes()
+
+
+def get_report_gcs_prefix() -> str:
+    env_value = os.getenv("REPORT_SOURCE_GCS_PREFIX")
+    if env_value:
+        return env_value
+    try:
+        return st.secrets.get("REPORT_SOURCE_GCS_PREFIX", DEFAULT_GCS_PREFIX)
+    except Exception:
+        return DEFAULT_GCS_PREFIX
 
 
 st.set_page_config(page_title="Owner Reports", layout="wide")
 st.title("Owner Reports Dashboard")
 
+gcs_prefix = get_report_gcs_prefix()
 report_dir = Path("reports")
-if not report_dir.exists():
-    st.error("No `reports/` directory found in the workspace.")
-    st.stop()
 
-files = sorted(report_dir.iterdir())
-md_files = [f for f in files if f.suffix.lower() in (".md", ".markdown")]
-csv_files = [f for f in files if f.suffix.lower() == ".csv"]
+try:
+    files = list_gcs_reports(gcs_prefix) if gcs_prefix else list_local_reports(report_dir)
+    active_gcs_prefix = gcs_prefix
+    source_label = gcs_prefix if gcs_prefix else str(report_dir)
+except Exception as exc:
+    if report_dir.exists():
+        st.warning(f"Could not load reports from `{gcs_prefix}`. Showing local reports instead.")
+        files = list_local_reports(report_dir)
+        active_gcs_prefix = None
+        source_label = str(report_dir)
+    else:
+        st.error(f"Could not load reports from `{gcs_prefix}`.")
+        st.exception(exc)
+        st.stop()
+
+md_files = [f for f in files if f.suffix in (".md", ".markdown")]
+csv_files = [f for f in files if f.suffix == ".csv"]
 
 st.sidebar.header("Controls")
+st.sidebar.caption(f"Source: {source_label}")
 mode = st.sidebar.radio("Show", ["Markdown", "CSV", "All"], index=0)
 
-def show_markdown(path: Path):
-    text = path.read_text(encoding="utf-8")
-    st.markdown(f"### {path.name}")
-    st.markdown(text, unsafe_allow_html=True)
-    st.download_button("Download", text, file_name=path.name)
 
-def show_csv(path: Path):
-    df = pd.read_csv(path)
-    st.markdown(f"### {path.name}")
+def show_markdown(report: ReportFile):
+    text = read_report_bytes(report, active_gcs_prefix).decode("utf-8")
+    st.markdown(f"### {report.name}")
+    st.markdown(text, unsafe_allow_html=True)
+    st.download_button("Download", text, file_name=report.name)
+
+
+def show_csv(report: ReportFile):
+    data = read_report_bytes(report, active_gcs_prefix)
+    df = pd.read_csv(BytesIO(data))
+    st.markdown(f"### {report.name}")
     st.dataframe(df)
-    st.download_button("Download CSV", path.read_bytes(), file_name=path.name)
+    st.download_button("Download CSV", data, file_name=report.name)
     numeric = df.select_dtypes(include="number")
     if not numeric.empty:
-        col = st.selectbox(f"Plot numeric column ({path.name})", numeric.columns.tolist())
+        col = st.selectbox(f"Plot numeric column ({report.name})", numeric.columns.tolist())
         st.bar_chart(df[col])
+
 
 if mode == "Markdown":
     if not md_files:
-        st.info("No markdown reports found in `reports/`.")
+        st.info("No markdown reports found.")
     else:
-        choice = st.sidebar.selectbox("Choose markdown", [f.name for f in md_files])
-        show_markdown(report_dir / choice)
+        choices = {f.name: f for f in md_files}
+        choice = st.sidebar.selectbox("Choose markdown", list(choices))
+        show_markdown(choices[choice])
 
 elif mode == "CSV":
     if not csv_files:
-        st.info("No CSV reports found in `reports/`.")
+        st.info("No CSV reports found.")
     else:
-        choice = st.sidebar.selectbox("Choose CSV", [f.name for f in csv_files])
-        show_csv(report_dir / choice)
+        choices = {f.name: f for f in csv_files}
+        choice = st.sidebar.selectbox("Choose CSV", list(choices))
+        show_csv(choices[choice])
 
 else:  # All
     for md in md_files:

@@ -21,14 +21,15 @@ https://wilcoanalysis-ld322r5mnq-uc.a.run.app
 - Identifies owners connected to multiple distinct properties.
 - Runs a baseline unsupervised ML segmentation model using `MiniBatchKMeans`.
 - Produces Markdown and CSV reports under `reports/`.
-- Serves generated reports through a Streamlit dashboard.
+- Serves generated reports through a Streamlit dashboard from Cloud Storage, with local
+  `reports/` fallback for development.
 - Deploys the Streamlit app to Google Cloud Run using the included `Dockerfile`.
 - Can run the report pipeline as a Cloud Run Job using Cloud Storage input/output.
 
 ## Repository Layout
 
 ```text
-app.py                         Streamlit reports dashboard
+app.py                         Streamlit reports dashboard with GCS report loading
 Dockerfile                     Cloud Run container definition
 requirements.txt               Python runtime dependencies
 pyproject.toml                 Project metadata and tooling config
@@ -95,8 +96,21 @@ Then open:
 http://localhost:8501
 ```
 
-The dashboard reads Markdown and CSV files from `reports/`. If reports have not been
-generated yet, run the pipeline first.
+By default, the dashboard reads Markdown and CSV report files from:
+
+```text
+gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest
+```
+
+Set a different report source with:
+
+```powershell
+$env:REPORT_SOURCE_GCS_PREFIX="gs://your-bucket/reports/latest"
+streamlit run app.py
+```
+
+If the GCS source is unavailable and local `reports/` exists, the dashboard falls back to
+local files for development.
 
 ## Run The Full Pipeline
 
@@ -187,6 +201,7 @@ gcloud.cmd run deploy wilcoanalysis `
   --source . `
   --region us-central1 `
   --project noble-kingdom-497421-f7 `
+  --set-env-vars REPORT_SOURCE_GCS_PREFIX=gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest `
   --allow-unauthenticated
 ```
 
@@ -260,8 +275,8 @@ gcloud.cmd storage cp --recursive gs://wilcoanalysis-artifacts-noble-kingdom-497
 - A deploy from the local workspace includes the current local `reports/` files.
 - A deploy from GitHub alone will need a report-generation step or a cloud storage location
   for report artifacts.
-- The Cloud Run Job can generate reports into Cloud Storage, but the Streamlit app still reads
-  local `reports/` files until the app is updated to read directly from Cloud Storage.
+- The Streamlit app reads Cloud Storage reports by default. Local `reports/` files are now
+  mainly a development fallback.
 - The current ML output is unsupervised segmentation. A true predictive model needs a
   labeled target, model evaluation metrics, and saved model artifacts.
 
