@@ -194,7 +194,22 @@ The model assigns each record to an `OwnerSegment` cluster and also reports an i
 
 ## Deploy To Google Cloud Run
 
-The app is deployable to Cloud Run from the project root:
+Deployment is now handled by GitHub Actions on every push to `main`:
+
+```text
+.github/workflows/deploy-cloud-run.yml
+```
+
+The workflow uses Google Workload Identity Federation, so no long-lived service account key
+is stored in GitHub. It deploys:
+
+- Cloud Run service: `wilcoanalysis`
+- Cloud Run Job definition: `wilco-owner-pipeline`
+
+The workflow does not execute the pipeline job automatically. Run the job manually when a new
+owner extract is ready.
+
+Manual local deploy is still available when needed:
 
 ```powershell
 gcloud.cmd run deploy wilcoanalysis `
@@ -207,6 +222,18 @@ gcloud.cmd run deploy wilcoanalysis `
 
 On Windows PowerShell, use `gcloud.cmd` if the PowerShell script shim is blocked by local
 execution policy.
+
+GitHub Actions deployment identity:
+
+```text
+github-deployer@noble-kingdom-497421-f7.iam.gserviceaccount.com
+```
+
+Workload Identity provider:
+
+```text
+projects/921836521382/locations/global/workloadIdentityPools/github-pool/providers/github-wilcoanalysis
+```
 
 ## Run The Pipeline In Cloud Run Jobs
 

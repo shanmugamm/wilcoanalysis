@@ -35,6 +35,8 @@ Maintain a base-version Williamson County property-owner analysis app:
 - `scripts/run_owner_pipeline_gcs_job.py`: Cloud Run Job wrapper that downloads an owner
   extract from GCS, runs the local pipeline, and uploads generated reports to GCS.
 - `Dockerfile`, `.dockerignore`, `.gcloudignore`: Cloud Run deployment setup.
+- `.github/workflows/deploy-cloud-run.yml`: deploys the Cloud Run service and job definition
+  from GitHub Actions on pushes to `main`; it does not execute the pipeline job.
 - `README.md`: user-facing project guide.
 
 ## Data And Artifacts
@@ -51,6 +53,9 @@ Maintain a base-version Williamson County property-owner analysis app:
   `gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest`.
 - The job runtime identity needs `roles/storage.objectAdmin` on the artifact bucket. Current
   default service account: `921836521382-compute@developer.gserviceaccount.com`.
+- GitHub Actions deployment uses Workload Identity Federation provider
+  `projects/921836521382/locations/global/workloadIdentityPools/github-pool/providers/github-wilcoanalysis`
+  and service account `github-deployer@noble-kingdom-497421-f7.iam.gserviceaccount.com`.
 
 ## Common Commands
 
@@ -87,7 +92,7 @@ Use sampled segmentation for faster development:
 python scripts\run_owner_pipeline.py --sample-segments 50000
 ```
 
-Deploy to Cloud Run:
+GitHub Actions deploys Cloud Run on every push to `main`. Manual deploy remains available:
 
 ```powershell
 gcloud.cmd run deploy wilcoanalysis `
