@@ -23,6 +23,9 @@ https://wilcoanalysis-ld322r5mnq-uc.a.run.app
 - Produces Markdown and CSV reports under `reports/`.
 - Serves generated reports through a Streamlit dashboard from Cloud Storage, with local
   `reports/` fallback for development.
+- Provides an interactive report explorer with categories, search, owner/geography filters,
+  multi-property organization exclusion, column selection, sorting, row limits, charts, and
+  filtered CSV downloads.
 - Deploys the Streamlit app to Google Cloud Run using the included `Dockerfile`.
 - Can run the report pipeline as a Cloud Run Job using Cloud Storage input/output.
 
@@ -111,6 +114,13 @@ streamlit run app.py
 
 If the GCS source is unavailable and local `reports/` exists, the dashboard falls back to
 local files for development.
+
+The dashboard has three views:
+
+- Overview: report inventory and high-level counts.
+- Tables: interactive CSV explorer with search, filters, sorting, column selection, and
+  filtered downloads.
+- Narratives: rendered Markdown reports.
 
 ## Run The Full Pipeline
 
