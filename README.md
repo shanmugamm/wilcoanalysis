@@ -1,134 +1,208 @@
-# Wilco Owner Data ML Exploration
+# Wilco Property Owner Analysis
 
-This project is a lightweight workspace for exploring `Owner_20260602.csv` with reproducible Python scripts.
+This repository contains the base version of a Williamson County property-owner analysis
+project. It ingests a local Wilco owner extract, creates owner and mailing-location
+features, runs first-pass ML segmentation, generates reports, and exposes the outputs in a
+Streamlit dashboard.
+
+The current deployed app is hosted on Google Cloud Run:
+
+```text
+https://wilcoanalysis-ld322r5mnq-uc.a.run.app
+```
+
+## Current Capabilities
+
+- Profiles the raw owner CSV without requiring the full file to stay in memory.
+- Classifies owners with interpretable heuristics such as individual, business, trust or
+  estate, and government.
+- Groups mailing addresses into Wilco-area, other Texas, out-of-state, unavailable, and
+  unknown geography buckets.
+- Identifies owners connected to multiple distinct properties.
+- Runs a baseline unsupervised ML segmentation model using `MiniBatchKMeans`.
+- Produces Markdown and CSV reports under `reports/`.
+- Serves generated reports through a Streamlit dashboard.
+- Deploys the Streamlit app to Google Cloud Run using the included `Dockerfile`.
+
+## Repository Layout
+
+```text
+app.py                         Streamlit reports dashboard
+Dockerfile                     Cloud Run container definition
+requirements.txt               Python runtime dependencies
+pyproject.toml                 Project metadata and tooling config
+scripts/
+  01_profile_owner_data.py     Raw owner-data profiling
+  02_owner_segments.py         Baseline ML clustering and segment summaries
+  03_owner_type_geo_analysis.py
+                                Owner type and mailing geography reports
+  04_multi_property_owners.py  Multiple-property owner analysis
+  run_owner_pipeline.py        End-to-end report pipeline
+src/owner_ml/
+  data.py                      CSV discovery, chunked reads, and cleanup
+  features.py                  Owner type, geography, exemption, and profile features
+reports/                       Generated report files
+```
 
 ## Data
 
-The source file is expected at:
+The raw source extract is expected in the project root using this naming pattern:
+
+```text
+Owner_YYYYMMDD.csv
+```
+
+For example:
 
 ```text
 Owner_20260602.csv
 ```
 
-The CSV is intentionally not copied into a nested project folder. It is large and should stay as the local raw extract.
+Raw extracts are intentionally ignored by git because they are large local data files.
+Generated reports are also ignored by git, except for the placeholder that keeps the
+`reports/` directory present.
 
 ## Setup
+
+Create and activate a virtual environment:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```powershell
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-## First Pass Profiling
+## Run The Dashboard
 
-Create a compact markdown profile without loading the whole file into memory:
+Start the Streamlit dashboard locally:
 
 ```powershell
-python scripts\01_profile_owner_data.py
+streamlit run app.py
 ```
 
-Outputs:
+Then open:
+
+```text
+http://localhost:8501
+```
+
+The dashboard reads Markdown and CSV files from `reports/`. If reports have not been
+generated yet, run the pipeline first.
+
+## Run The Full Pipeline
+
+Run all report steps against the newest `Owner_*.csv` file in the project root:
+
+```powershell
+python scripts\run_owner_pipeline.py
+```
+
+Use a specific extract:
+
+```powershell
+python scripts\run_owner_pipeline.py --data Owner_20260602.csv
+```
+
+Use sampled segmentation for a faster development run:
+
+```powershell
+python scripts\run_owner_pipeline.py --sample-segments 50000
+```
+
+Pipeline outputs include:
 
 ```text
 reports/owner_profile.md
-```
-
-## Automated Report Pipeline
-
-Drop each new extract into this folder as `Owner_YYYYMMDD.csv`, then run:
-
-```powershell
-.\scripts\run_owner_pipeline.ps1
-```
-
-The pipeline automatically selects the newest `Owner_*.csv` file and regenerates the profile, owner-type/geography, multiple-property-owner, and segmentation reports.
-
-Use a specific file:
-
-```powershell
-.\scripts\run_owner_pipeline.ps1 -Data Owner_20260602.csv
-```
-
-Use sampled segmentation for a faster run:
-
-```powershell
-.\scripts\run_owner_pipeline.ps1 -SampleSegments 50000
-```
-
-The reports are generated under `reports/` and intentionally ignored by git.
-
-## Starter ML: Owner Segments
-
-Run a baseline clustering experiment over sampled owner/address/exemption features:
-
-```powershell
-python scripts\02_owner_segments.py --sample-rows 50000 --clusters 8
-```
-
-Run it over the full file:
-
-```powershell
-python scripts\02_owner_segments.py --full --clusters 8
-```
-
-Outputs:
-
-```text
-reports/owner_segments.csv
-reports/owner_segmentation_report.md
-reports/owner_segment_summary.csv
-reports/owner_profile_segment_summary.csv
-```
-
-## Owner Type And Geography Analysis
-
-Build interpretable tables for owner-type guesses and mailing geography:
-
-```powershell
-python scripts\03_owner_type_geo_analysis.py
-```
-
-Outputs:
-
-```text
 reports/owner_type_geo_analysis.md
-reports/owner_type_summary.csv
-reports/mailing_geo_summary.csv
-reports/owner_type_by_geo.csv
-reports/top_out_of_state_owner_places.csv
-reports/top_texas_other_owner_places.csv
-```
-
-## Multiple-Property Owners
-
-Find owners connected to more than one distinct property:
-
-```powershell
-python scripts\04_multi_property_owners.py
-```
-
-Use only primary-owner records:
-
-```powershell
-python scripts\04_multi_property_owners.py --primary-only
-```
-
-Outputs:
-
-```text
 reports/multi_property_owners_report.md
-reports/multi_property_owner_summary.csv
-reports/top_multi_property_owners.csv
-reports/multi_property_owner_detail.csv
+reports/owner_segmentation_report.md
+reports/pipeline_manifest.md
 ```
 
-## Suggested Exploration Questions
+## Individual Analysis Commands
 
-- Which owner records look like businesses, trusts, governments, or individuals?
-- Which cities/states dominate out-of-area ownership?
-- Are undeliverable records concentrated in particular owner types or address-change reasons?
-- What exemption combinations appear most often?
-- Can owner/property records be grouped into useful operational segments?
-- Which owners are connected to multiple properties?
+Profile the source file:
+
+```powershell
+python scripts\01_profile_owner_data.py --data Owner_20260602.csv
+```
+
+Run owner type and mailing geography analysis:
+
+```powershell
+python scripts\03_owner_type_geo_analysis.py --data Owner_20260602.csv
+```
+
+Find owners connected to multiple properties:
+
+```powershell
+python scripts\04_multi_property_owners.py --data Owner_20260602.csv
+```
+
+Run baseline ML owner segmentation:
+
+```powershell
+python scripts\02_owner_segments.py --data Owner_20260602.csv --sample-rows 50000 --clusters 8
+```
+
+Run segmentation against the full file:
+
+```powershell
+python scripts\02_owner_segments.py --data Owner_20260602.csv --full --clusters 8
+```
+
+## Feature And ML Notes
+
+The current ML step is an exploratory clustering model, not a supervised prediction model.
+It uses engineered features such as:
+
+- owner type guess from owner-name patterns;
+- mailing geography category;
+- out-of-area mailing indicator;
+- exemption indicators and exemption count;
+- address age;
+- taxing-unit count;
+- ownership percentage;
+- primary-owner and undeliverable flags.
+
+The model assigns each record to an `OwnerSegment` cluster and also reports an interpretable
+`OwnerProfileSegment`, such as `local_homestead`, `business_out_of_area`,
+`trust_estate_out_of_area`, or `individual_out_of_area`.
+
+## Deploy To Google Cloud Run
+
+The app is deployable to Cloud Run from the project root:
+
+```powershell
+gcloud.cmd run deploy wilcoanalysis `
+  --source . `
+  --region us-central1 `
+  --project noble-kingdom-497421-f7 `
+  --allow-unauthenticated
+```
+
+On Windows PowerShell, use `gcloud.cmd` if the PowerShell script shim is blocked by local
+execution policy.
+
+## Important Limitations
+
+- Report files are local generated artifacts and are not committed to git.
+- A deploy from the local workspace includes the current local `reports/` files.
+- A deploy from GitHub alone will need a report-generation step or a cloud storage location
+  for report artifacts.
+- The current ML output is unsupervised segmentation. A true predictive model needs a
+  labeled target, model evaluation metrics, and saved model artifacts.
+
+## Good Next Steps
+
+- Add a dashboard page focused on ML segments instead of only file browsing.
+- Store generated report artifacts in Google Cloud Storage.
+- Add a repeatable build or CI step that regenerates reports before deployment.
+- Define a supervised prediction target if the project needs actual forecasts or scores.
+- Save trained model artifacts and expose a small prediction workflow in the app.
