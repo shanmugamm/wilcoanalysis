@@ -27,6 +27,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Only count primary owners in the multiple-property report.",
     )
+    parser.add_argument(
+        "--exclude-organizations-multi-property",
+        action="store_true",
+        help="Exclude organization-style owners from the multiple-property report.",
+    )
     return parser.parse_args()
 
 
@@ -84,6 +89,8 @@ def main() -> None:
 
     if args.primary_only_multi_property:
         commands[2].append("--primary-only")
+    if args.exclude_organizations_multi_property:
+        commands[2].append("--exclude-organizations")
 
     if args.sample_segments:
         commands[3].extend(["--sample-rows", str(args.sample_segments)])

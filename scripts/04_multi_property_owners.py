@@ -9,7 +9,7 @@ import pandas as pd
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
 from owner_ml.data import DEFAULT_DATA_PATH, read_owner_sample
-from owner_ml.features import add_owner_features
+from owner_ml.features import add_owner_features, organization_owner_mask
 
 
 BASE_COLUMNS = [
@@ -33,7 +33,6 @@ BASE_COLUMNS = [
     "Address3",
 ]
 
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Find owners connected to multiple properties.")
     parser.add_argument("--data", default=str(DEFAULT_DATA_PATH), help="Path to owner CSV.")
@@ -47,6 +46,11 @@ def parse_args() -> argparse.Namespace:
         "--primary-only",
         action="store_true",
         help="Only count records where PrimaryOwner is 1.",
+    )
+    parser.add_argument(
+        "--exclude-organizations",
+        action="store_true",
+        help="Exclude organization-style owners such as LLCs, corporations, banks, and governments.",
     )
     parser.add_argument(
         "--top-n",
@@ -98,6 +102,11 @@ def main() -> None:
     df = add_owner_features(read_owner_sample(args.data, nrows=None, usecols=usecols))
     if args.primary_only:
         df = df[df["PrimaryOwner"].eq(1)].copy()
+    excluded_organization_rows = 0
+    if args.exclude_organizations:
+        org_mask = organization_owner_mask(df)
+        excluded_organization_rows = int(org_mask.sum())
+        df = df[~org_mask].copy()
 
     df = df[[column for column in BASE_COLUMNS if column in df.columns]].copy()
     df["OwnerKey"] = df["OwnerID"].where(df["OwnerID"].ne(""), df["FullName"] + "|" + df["MailingAddress"])
@@ -157,6 +166,8 @@ def main() -> None:
             multi_property_records=multi_property_records,
             min_properties=args.min_properties,
             primary_only=args.primary_only,
+            exclude_organizations=args.exclude_organizations,
+            excluded_organization_rows=excluded_organization_rows,
             top_owners=top_owners,
         ),
         encoding="utf-8",
@@ -176,6 +187,8 @@ def build_report(
     multi_property_records: int,
     min_properties: int,
     primary_only: bool,
+    exclude_organizations: bool,
+    excluded_organization_rows: int,
     top_owners: pd.DataFrame,
 ) -> str:
     lines = [
@@ -183,6 +196,8 @@ def build_report(
         "",
         f"- Minimum distinct properties: `{min_properties}`",
         f"- Primary owners only: `{'yes' if primary_only else 'no'}`",
+        f"- Exclude organizations: `{'yes' if exclude_organizations else 'no'}`",
+        f"- Organization rows excluded: `{excluded_organization_rows:,}`",
         f"- Distinct owner keys analyzed: `{total_owners:,}`",
         f"- Owners meeting threshold: `{multi_owner_count:,}` ({percent(multi_owner_count / total_owners)})",
         f"- Distinct properties tied to these owners: `{multi_property_records:,}`",

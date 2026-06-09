@@ -1,0 +1,58 @@
+name: Deploy Streamlit Service
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - app.py
+      - Dockerfile
+      - requirements.txt
+      - pyproject.toml
+      - src/owner_ml/features.py
+      - .dockerignore
+      - .gcloudignore
+      - .github/workflows/deploy-streamlit-service.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: streamlit-service-deploy
+  cancel-in-progress: true
+
+env:
+  PROJECT_ID: noble-kingdom-497421-f7
+  REGION: us-central1
+  SERVICE_NAME: wilcoanalysis
+  REPORT_SOURCE_GCS_PREFIX: gs://wilcoanalysis-artifacts-noble-kingdom-497421-f7/reports/latest
+  DEPLOY_SERVICE_ACCOUNT: github-deployer@noble-kingdom-497421-f7.iam.gserviceaccount.com
+  WORKLOAD_IDENTITY_PROVIDER: projects/921836521382/locations/global/workloadIdentityPools/github-pool/providers/github-wilcoanalysis
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy Streamlit service
+        run: |
+          gcloud run deploy "${SERVICE_NAME}" \
+            --source . \
+            --region "${REGION}" \
+            --project "${PROJECT_ID}" \
+            --set-env-vars "REPORT_SOURCE_GCS_PREFIX=${REPORT_SOURCE_GCS_PREFIX}" \
+            --quiet
